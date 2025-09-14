@@ -1,8 +1,15 @@
-from langgraph.graph import StateGraph, START, END
+# backend.py
+
+import requests
+import wikipedia
 from typing import TypedDict, Annotated
-from langchain_core.messages import BaseMessage, HumanMessage
+
+# --- LangChain & LangGraph Imports ---
+from langchain_core.messages import BaseMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_core.tools import tool
+from langgraph.graph import StateGraph, START
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_community.tools import DuckDuckGoSearchRun
@@ -70,79 +77,57 @@ def get_weather(city: str) -> dict:
         return {"error": str(e)}
 
 
-@tool
-def get_stock_price(symbol: str) -> dict:
-    """
-    Fetch latest stock price for a given symbol (e.g. 'AAPL', 'TSLA') 
-    using Alpha Vantage with API key in the URL.
-    """
-    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey=C9PE94QUEW9VWGFM"
-    r = requests.get(url)
-    return r.json()
+        @tool
+        def get_stock_price(symbol: str) -> dict:
+            """Fetch latest stock price for a given symbol (e.g. 'AAPL', 'TSLA')"""
+            api_key = self.secrets.get("ALPHA_VANTAGE_API_KEY")
+            if not api_key:
+                return {"error": "Alpha Vantage API key not found"}
+            url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={api_key}"
+            response = requests.get(url)
+            return response.json()
 
-@tool
-def wikipedia_search(query: str, sentences: int = 3) -> dict:
-    """
-    Search Wikipedia for a given query and return a summary.
-    """
-    try:
-        summary = wikipedia.summary(query, sentences=sentences)
-        return {
-            "query": query,
-            "summary": summary
-        }
-    except wikipedia.DisambiguationError as e:
-        return {"error": f"Disambiguation needed: {e.options[:5]}"}
-    except wikipedia.PageError:
-        return {"error": f"No Wikipedia page found"}
-    except Exception as e:
-        return {"error": str(e)}
+        @tool
+        def wikipedia_search(query: str, sentences: int = 3) -> dict:
+            """Search Wikipedia for a given query and return a summary."""
+            try:
+                return {"summary": wikipedia.summary(query, sentences=sentences)}
+            except Exception as e:
+                return {"error": str(e)}
 
-tools = [search_tool,get_weather, get_stock_price, wikipedia_search, calculator]
-llm_with_tools = llm.bind_tools(tools)
+        # Add other tools like calculator and DuckDuckGo search
+        search_tool = DuckDuckGoSearchRun(region="us-en")
+        
+        # We can define the calculator tool directly as it needs no secrets
+        @tool
+        def calculator(first_num: float, second_num: float, operation: str) -> dict:
+            """Perform a basic arithmetic operation."""
+            # ... (calculator logic from your original code) ...
+            if operation == "add": return {"result": first_num + second_num}
+            if operation == "sub": return {"result": first_num - second_num}
+            if operation == "mul": return {"result": first_num * first_num}
+            if operation == "div": return {"result": first_num / second_num}
+            return {"error": "Invalid operation"}
 
-# -------------------
-# 3. State
-# -------------------
-class ChatState(TypedDict):
-    messages: Annotated[list[BaseMessage], add_messages]
 
-# -------------------
-# 4. Nodes
-# -------------------
-def chat_node(state: ChatState):
-    """LLM node that may answer or request a tool call."""
-    messages = state["messages"]
-    response = llm_with_tools.invoke(messages)
-    return {"messages": [response]}
+        return [search_tool, get_weather, get_stock_price, wikipedia_search, calculator]
 
-tool_node = ToolNode(tools)
+    def _compile_chatbot(self):
+        """Compiles and returns the LangGraph chatbot."""
+        class ChatState(TypedDict):
+            messages: Annotated[list[BaseMessage], add_messages]
 
-# -------------------
-# 5. Checkpointer
-# -------------------
-conn = sqlite3.connect(database="chatbot.db", check_same_thread=False)
-checkpointer = SqliteSaver(conn=conn)
+        llm_with_tools = self.llm.bind_tools(self.tools)
+        tool_node = ToolNode(self.tools)
 
-# -------------------
-# 6. Graph
-# -------------------
-graph = StateGraph(ChatState)
-graph.add_node("chat_node", chat_node)
-graph.add_node("tools", tool_node)
+        # WARNING: In-memory database is not persistent on Streamlit Cloud.
+        memory = SqliteSaver.from_conn_string(":memory:")
 
-graph.add_edge(START, "chat_node")
-
-graph.add_conditional_edges("chat_node",tools_condition)
-graph.add_edge('tools', 'chat_node')
-
-chatbot = graph.compile(checkpointer=checkpointer)
-
-# -------------------
-# 7. Helper
-# -------------------
-def retrieve_all_threads():
-    all_threads = set()
-    for checkpoint in checkpointer.list(None):
-        all_threads.add(checkpoint.config["configurable"]["thread_id"])
-    return list(all_threads)
+        graph = StateGraph(ChatState)
+        graph.add_node("chatbot", llm_with_tools)
+        graph.add_node("tools", tool_node)
+        graph.add_edge(START, "chatbot")
+        graph.add_conditional_edges("chatbot", tools_condition)
+        graph.add_edge("tools", "chatbot")
+        
+        return graph.compile(checkpointer=memory)

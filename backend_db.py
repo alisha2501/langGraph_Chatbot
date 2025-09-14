@@ -12,7 +12,7 @@ from langchain_core.tools import tool
 from langgraph.graph import StateGraph, START
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoints.sqlite import SqliteSaver
 
 class BackendService:
     def __init__(self, secrets):

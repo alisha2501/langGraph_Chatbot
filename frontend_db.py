@@ -8,7 +8,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
-    model="models/gemini-2.5-flash")
+    model="models/gemini-1.5-flash")
 # =========================== Utilities ===========================
 def generate_thread_id():
     return uuid.uuid4()

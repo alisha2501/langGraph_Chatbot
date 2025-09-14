@@ -14,7 +14,7 @@ import requests
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
-    model="models/gemini-2.5-flash")
+    model="models/gemini-1.5-flash")
 
 # -------------------
 # 2. Tools

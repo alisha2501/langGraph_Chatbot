@@ -11,45 +11,8 @@
 
 ---
 
-## 🏛️ System Architecture
 
-```mermaid
-flowchart TD
-    User([User Query / Assertion]) --> UI[Streamlit UI<br/>frontend_db.py]
-    UI --> LangGraph[LangGraph Multi-Agent Orchestrator<br/>backend_db.py]
 
-    subgraph LangGraph Multi-Agent Engine
-        direction TB
-        Researcher["🔍 Researcher Agent<br/>(Decomposes query, gathers evidence)"]
-        Critic["⚖️ Adversarial Critic Agent<br/>(Audits claims against MCP Rubric)"]
-        FactChecker["🛡️ Fact-Checker Agent<br/>(Cross-references sources, computes confidence)"]
-        Synthesizer["📝 Final Synthesizer<br/>(Generates executive report & matrix)"]
-
-        Researcher --> Critic
-        Critic -- "Weak claims & iteration < Max" --> Researcher
-        Critic -- "Claims validated or iteration >= Max" --> FactChecker
-        FactChecker --> Synthesizer
-    end
-
-    LangGraph <--> Checkpoint[(SQLite Checkpointer<br/>chatbot.db)]
-
-    subgraph MCP Server [mcp_server.py (FastMCP)]
-        direction TB
-        T1["Tool: web_search<br/>(DuckDuckGo Live Web)"]
-        T2["Tool: wikipedia_lookup<br/>(Wikipedia REST API)"]
-        T3["Tool: analyze_source_credibility<br/>(Domain Trust Heuristics)"]
-        R1["Resource: factcheck://rubric<br/>(Verification SOP)"]
-    end
-
-    Researcher -.-> |MCP stdio| T1
-    Researcher -.-> |MCP stdio| T2
-    Critic -.-> |MCP stdio| R1
-    FactChecker -.-> |MCP stdio| T3
-
-    Synthesizer --> Report([Verified Intelligence Report])
-```
-
----
 
 ## 🌟 Key Features
 
@@ -125,22 +88,7 @@ python test_mcp.py
 streamlit run frontend_db.py
 ```
 
----
 
-## 🎯 Job-Switch Interview Talking Points
-
-When presenting this project to interviewers or hiring managers, highlight these core engineering decisions:
-
-- **Why MCP over direct function calling?**
-  > *"Instead of coupling external tools directly to the agent framework, I used the Model Context Protocol. This separates tool implementation from agent orchestration, allowing tools to be shared across any MCP-compliant client (Claude, Cursor, custom agents) or hosted as independent microservices."*
-
-- **Why LangGraph for multi-agent workflows?**
-  > *"Monolithic LLM prompts hallucinate when tasked with research and fact-checking simultaneously. I built a cyclical state graph with specialized agents: a Researcher for evidence gathering, an adversarial Critic for rubric compliance, and a Fact-Checker for confidence scoring. LangGraph's conditional edges enable automated self-correction before generating the final report."*
-
-- **How did you prevent infinite loops in the critique cycle?**
-  > *"The graph maintains an `iteration_count` in the `ResearchAgentState`. If the Critic requests revisions, the conditional router verifies that `iteration_count < MAX_ITERATIONS` before routing back to the Researcher, preventing runaway API calls."*
-
----
 
 ## 📄 License
 

@@ -1,74 +1,147 @@
-# LangGraph Chatbot with Tools & Memory
+# FactGraph AI: Autonomous Multi-Agent Research & Fact-Checking Engine
+### Built with LangGraph Cyclical Orchestration & Model Context Protocol (MCP)
 
-This project is an **AI-powered chatbot** built using [LangGraph](https://github.com/langchain-ai/langgraph), [LangChain](https://www.langchain.com/), and [Streamlit](https://streamlit.io/).  
-It integrates multiple tools such as **web search, weather lookup, stock prices, Wikipedia summaries, and a calculator**, and supports **persistent memory across chat sessions** using SQLite.
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-FF4B4B?style=for-the-badge&logo=langchain&logoColor=white)](https://github.com/langchain-ai/langgraph)
+[![Model Context Protocol](https://img.shields.io/badge/Protocol-MCP%20FastMCP-000000?style=for-the-badge)](https://modelcontextprotocol.io)
+[![Streamlit](https://img.shields.io/badge/Frontend-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
----
-
-##  Features
-
-- ✅ **Conversational AI** powered by **Google Gemini** (`gemini-2.5-flash`).
-- 🔧 **Integrated tools**:
-  - 🌐 DuckDuckGo Web Search  
-  - ☁️ Weather lookup (via OpenWeather API)  
-  - 📈 Stock price fetcher (via Alpha Vantage API)  
-  - 📚 Wikipedia search & summarizer  
-  - ➕➖✖️➗ Calculator
-- 💾 **Persistent chat memory** using `SqliteSaver` (sessions stored in `chatbot.db`).
-- 🧵 **Multiple conversations/threads** with ability to rename threads automatically.
-- 🎛️ **Interactive UI** using Streamlit with sidebar conversation management.
-- ⚡ **Streaming responses** with live tool execution status updates.
+**FactGraph AI** is a decoupled multi-agent intelligence system designed to autonomously investigate complex topics, claims, and assertions. It combines **LangGraph's cyclical graph execution** with Anthropic's **Model Context Protocol (MCP)**, enforcing an adversarial **critic loop** and multi-source cross-verification before publishing factual reports.
 
 ---
 
-##  Project Structure
-- ├── backend_db.py # LangGraph + tools + chatbot definition
-- ├── frontend_db.py # Streamlit frontend
-- ├── chatbot.db 
-- ├── .env # Environment variables (API keys)
-- ├── requirements.txt # Dependencies
-- └── README.md # Project documentation
+## 🏛️ System Architecture
 
+```mermaid
+flowchart TD
+    User([User Query / Assertion]) --> UI[Streamlit UI<br/>frontend_db.py]
+    UI --> LangGraph[LangGraph Multi-Agent Orchestrator<br/>backend_db.py]
 
----
+    subgraph LangGraph Multi-Agent Engine
+        direction TB
+        Researcher["🔍 Researcher Agent<br/>(Decomposes query, gathers evidence)"]
+        Critic["⚖️ Adversarial Critic Agent<br/>(Audits claims against MCP Rubric)"]
+        FactChecker["🛡️ Fact-Checker Agent<br/>(Cross-references sources, computes confidence)"]
+        Synthesizer["📝 Final Synthesizer<br/>(Generates executive report & matrix)"]
 
-##  Setup
+        Researcher --> Critic
+        Critic -- "Weak claims & iteration < Max" --> Researcher
+        Critic -- "Claims validated or iteration >= Max" --> FactChecker
+        FactChecker --> Synthesizer
+    end
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/your-username/langgraph-chatbot.git
-cd langgraph-chatbot
+    LangGraph <--> Checkpoint[(SQLite Checkpointer<br/>chatbot.db)]
+
+    subgraph MCP Server [mcp_server.py (FastMCP)]
+        direction TB
+        T1["Tool: web_search<br/>(DuckDuckGo Live Web)"]
+        T2["Tool: wikipedia_lookup<br/>(Wikipedia REST API)"]
+        T3["Tool: analyze_source_credibility<br/>(Domain Trust Heuristics)"]
+        R1["Resource: factcheck://rubric<br/>(Verification SOP)"]
+    end
+
+    Researcher -.-> |MCP stdio| T1
+    Researcher -.-> |MCP stdio| T2
+    Critic -.-> |MCP stdio| R1
+    FactChecker -.-> |MCP stdio| T3
+
+    Synthesizer --> Report([Verified Intelligence Report])
 ```
 
-### 2. Create and activate virtual environment
-```bash
-python -m venv venv
-source venv/bin/activate    # On macOS/Linux
-venv\Scripts\activate       # On Windows
+---
+
+## 🌟 Key Features
+
+1. **Model Context Protocol (MCP) Tool-Serving Layer**:
+   - Tools are **not hardcoded** inside the agent. Instead, they are exposed over standard MCP (`stdio` transport) using the official `fastmcp` SDK.
+   - Includes **MCP Tools** (`web_search`, `wikipedia_lookup`, `analyze_source_credibility`), an **MCP Resource** (`factcheck://rubric`), and an **MCP Prompt** (`decompose_query_prompt`).
+2. **Adversarial Reflection & Cyclical Loop**:
+   - The **Critic Agent** reads the verification rubric served directly over MCP and evaluates the Researcher's draft. If claims are speculative or lack attribution, the graph loops back with targeted directives.
+3. **Structured State Machine**:
+   - Unlike basic chat scripts that only track `messages: list`, the graph tracks an explicit `ResearchAgentState` containing atomic claims, raw evidence, editorial feedback, and per-claim confidence scores.
+4. **Source Credibility Heuristics**:
+   - Audits sources into **HIGH** (peer-reviewed, government, top news wires), **MEDIUM** (established tech/media), or **CAUTION** tiers.
+5. **Persistent State & Resumable Sessions**:
+   - Powered by `SqliteSaver` in `chatbot.db`, allowing users to resume past research threads or delete completed investigations.
+6. **100% Free & Zero-Cost**:
+   - No paid APIs required. Powered by Google Gemini Flash free tier, DuckDuckGo, and Wikipedia REST.
+
+---
+
+## 📂 Repository Structure
+
 ```
-### 3. Install dependencies
+├── backend_db.py      # LangGraph Multi-Agent Orchestrator & State Machine
+├── mcp_server.py      # FastMCP Server (Tools, Resources, Prompts)
+├── frontend_db.py     # Streamlit UI with Live Pipeline Tracker
+├── test_mcp.py        # Automated test suite for MCP Server over stdio
+├── chatbot.db         # SQLite database (LangGraph checkpoints & thread titles)
+├── requirements.txt   # Project dependencies
+└── README.md          # System documentation & interview guide
+```
+
+---
+
+## 🚀 Quickstart Guide
+
+### 1. Clone & Set Up Virtual Environment
+
 ```bash
+git clone https://github.com/your-username/FactGraph-AI.git
+cd FactGraph-AI
+
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 4. Setup environment variables
+### 2. Configure Environment Variables
+
+Create a `.env` file in the root directory:
+```env
+GOOGLE_API_KEY=your_free_google_ai_studio_api_key_here
+```
+*(Alternatively, you can input your API key directly in the Streamlit sidebar at runtime).*
+
+### 3. Verify the MCP Server
+
+Run the automated MCP test suite to confirm the server and tool transports are functioning:
 ```bash
-GOOGLE_API_KEY=your_google_api_key_here
-OPENWEATHER_API_KEY=your_openweather_api_key_here
-ALPHAVANTAGE_API_KEY=your_alpha_vantage_api_key_here
+python test_mcp.py
 ```
 
-## Run the App
-``` bash
-streamlit run app.py
+### 4. Launch the Application
+
+```bash
+streamlit run frontend_db.py
 ```
 
-## Usage
+---
 
-- Start a new chat via sidebar → "New Chat".
-- Conversations are saved in chatbot.db and can be resumed anytime.
-- The chatbot can automatically call tools when required (e.g., answering math problems, looking up stock prices, or fetching weather).
-- Thread titles are auto-generated from the first user message.
+## 🎯 Job-Switch Interview Talking Points
 
-## License
+When presenting this project to interviewers or hiring managers, highlight these core engineering decisions:
 
+- **Why MCP over direct function calling?**
+  > *"Instead of coupling external tools directly to the agent framework, I used the Model Context Protocol. This separates tool implementation from agent orchestration, allowing tools to be shared across any MCP-compliant client (Claude, Cursor, custom agents) or hosted as independent microservices."*
+
+- **Why LangGraph for multi-agent workflows?**
+  > *"Monolithic LLM prompts hallucinate when tasked with research and fact-checking simultaneously. I built a cyclical state graph with specialized agents: a Researcher for evidence gathering, an adversarial Critic for rubric compliance, and a Fact-Checker for confidence scoring. LangGraph's conditional edges enable automated self-correction before generating the final report."*
+
+- **How did you prevent infinite loops in the critique cycle?**
+  > *"The graph maintains an `iteration_count` in the `ResearchAgentState`. If the Critic requests revisions, the conditional router verifies that `iteration_count < MAX_ITERATIONS` before routing back to the Researcher, preventing runaway API calls."*
+
+---
+
+## 📄 License
+
+Distributed under the MIT License.
